@@ -1,22 +1,33 @@
 'use client';
 
-import { useMemo } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { demoTable, demoFixtures } from '@/data/demo';
 import { simulate, type TableRow } from '@/lib/simulate';
+import { demoTable, demoFixtures } from '@/data/demo';
 
-type Pick = { outcome:'H'|'D'|'A'; homeGoals?:number|null; awayGoals?:number|null };
-
-export default function StandingsPage() {
+function StandingsInner() {
   const params = useSearchParams();
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const gw = Number(params.get('gw') || 1);
 
+  const [baseTable, setBaseTable] = useState<TableRow[] | null>(null);
+  useEffect(() => {
+    if (!mounted) return;
+    setBaseTable(demoTable); // baseline for now
+  }, [mounted]);
+
+  type Pick = { outcome: 'H' | 'D' | 'A'; homeGoals?: number | null; awayGoals?: number | null };
   const picks: Record<number, Pick> = useMemo(() => {
-    const raw = typeof window !== 'undefined' ? localStorage.getItem(`picks_gw_${gw}`) : null;
+    if (!mounted) return {};
+    const raw = localStorage.getItem(`picks_gw_${gw}`);
     return raw ? JSON.parse(raw) : {};
-  }, [gw]);
+  }, [mounted, gw]);
 
   const simulated = useMemo(() => {
+    if (!mounted || !baseTable) return demoTable;
     const fx = demoFixtures
       .filter(f => picks[f.id]?.outcome)
       .map(f => ({
@@ -27,15 +38,15 @@ export default function StandingsPage() {
         pickHomeGoals: picks[f.id].homeGoals ?? null,
         pickAwayGoals: picks[f.id].awayGoals ?? null,
       }));
-    return simulate(demoTable, fx, { gdWinDelta: 1, gdLossDelta: -1 });
-  }, [picks]);
+    return simulate(baseTable, fx, { gdWinDelta: 1, gdLossDelta: -1 });
+  }, [mounted, baseTable, picks]);
 
   const top8 = simulated.slice(0, 8);
 
   return (
     <main className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl font-bold">What-If Standings (GW {gw})</h1>
-      <p className="text-sm text-slate-600 mt-1">Assumes ±1 GD swing when scoreline is not provided.</p>
+      <p className="text-sm text-slate-600 mt-1">Client-only render to avoid hydration issues.</p>
 
       <div className="mt-6 overflow-x-auto">
         <table className="min-w-full text-sm">
@@ -74,5 +85,13 @@ export default function StandingsPage() {
         </a>
       </div>
     </main>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<main className="max-w-3xl mx-auto p-6">Loading…</main>}>
+      <StandingsInner />
+    </Suspense>
   );
 }
