@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 
 type Pick = { outcome:'H'|'D'|'A'; homeGoals?:number|null; awayGoals?:number|null };
@@ -14,7 +14,7 @@ export default function PredictPage() {
   const [picks, setPicks] = useState<Record<number, Pick>>({});
 
   useEffect(() => {
-    fetch(`/api/fixtures?gw=${gw}`)
+    fetch(`/api/fd-fixtures?gw=${gw}`)
       .then(r => r.json())
       .then(j => setFixtures(j.fixtures || []))
       .catch(() => setFixtures([]));

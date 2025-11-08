@@ -16,7 +16,7 @@ function StandingsInner() {
   const [baseTable, setBaseTable] = useState<TableRow[] | null>(null);
   useEffect(() => {
     if (!mounted) return;
-    fetch('/api/standings')
+    fetch('/api/fd-standings')
       .then(r => r.json())
       .then(j => setBaseTable(j.table || null))
       .catch(() => setBaseTable(null));
@@ -28,12 +28,10 @@ function StandingsInner() {
     return raw ? JSON.parse(raw) : {};
   }, [mounted, gw]);
 
-  // Note: simulation still uses fixtures the user chose on the Predict page.
-  // Points and GD are applied per your simulator (±1 GD when score omitted).
   const [fixtures, setFixtures] = useState<{id:number;homeTeam:string;awayTeam:string}[]>([]);
   useEffect(() => {
     if (!mounted) return;
-    fetch(`/api/fixtures?gw=${gw}`)
+    fetch(`/api/fd-fixtures?gw=${gw}`)
       .then(r => r.json())
       .then(j => setFixtures(j.fixtures || []))
       .catch(() => setFixtures([]));
@@ -63,7 +61,7 @@ function StandingsInner() {
   return (
     <main className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl font-bold">What-If Standings (GW {gw})</h1>
-      <p className="text-sm text-slate-600 mt-1">Live baseline; ±1 GD when scoreline is not provided.</p>
+      <p className="text-sm text-slate-600 mt-1">Live baseline (Football-Data.org); ±1 GD when scoreline is not provided.</p>
 
       <div className="mt-6 overflow-x-auto">
         <table className="min-w-full text-sm">
