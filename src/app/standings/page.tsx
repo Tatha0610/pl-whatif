@@ -3,32 +3,45 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { simulate, type TableRow } from '@/lib/simulate';
-import { demoTable, demoFixtures } from '@/data/demo';
+
+type Pick = { outcome:'H'|'D'|'A'; homeGoals?:number|null; awayGoals?:number|null };
 
 function StandingsInner() {
   const params = useSearchParams();
-
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const gw = Number(params.get('gw') || 1);
+  const gw = Number(params.get('gw') || 11);
 
   const [baseTable, setBaseTable] = useState<TableRow[] | null>(null);
   useEffect(() => {
     if (!mounted) return;
-    setBaseTable(demoTable); // baseline for now
+    fetch('/api/standings')
+      .then(r => r.json())
+      .then(j => setBaseTable(j.table || null))
+      .catch(() => setBaseTable(null));
   }, [mounted]);
 
-  type Pick = { outcome: 'H' | 'D' | 'A'; homeGoals?: number | null; awayGoals?: number | null };
   const picks: Record<number, Pick> = useMemo(() => {
     if (!mounted) return {};
     const raw = localStorage.getItem(`picks_gw_${gw}`);
     return raw ? JSON.parse(raw) : {};
   }, [mounted, gw]);
 
+  // Note: simulation still uses fixtures the user chose on the Predict page.
+  // Points and GD are applied per your simulator (±1 GD when score omitted).
+  const [fixtures, setFixtures] = useState<{id:number;homeTeam:string;awayTeam:string}[]>([]);
+  useEffect(() => {
+    if (!mounted) return;
+    fetch(`/api/fixtures?gw=${gw}`)
+      .then(r => r.json())
+      .then(j => setFixtures(j.fixtures || []))
+      .catch(() => setFixtures([]));
+  }, [mounted, gw]);
+
   const simulated = useMemo(() => {
-    if (!mounted || !baseTable) return demoTable;
-    const fx = demoFixtures
+    if (!mounted || !baseTable) return baseTable ?? [];
+    const fx = fixtures
       .filter(f => picks[f.id]?.outcome)
       .map(f => ({
         id: f.id,
@@ -39,14 +52,18 @@ function StandingsInner() {
         pickAwayGoals: picks[f.id].awayGoals ?? null,
       }));
     return simulate(baseTable, fx, { gdWinDelta: 1, gdLossDelta: -1 });
-  }, [mounted, baseTable, picks]);
+  }, [mounted, baseTable, picks, fixtures]);
+
+  if (!mounted || !baseTable) {
+    return <main className="max-w-3xl mx-auto p-6">Loading standings…</main>;
+  }
 
   const top8 = simulated.slice(0, 8);
 
   return (
     <main className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl font-bold">What-If Standings (GW {gw})</h1>
-      <p className="text-sm text-slate-600 mt-1">Client-only render to avoid hydration issues.</p>
+      <p className="text-sm text-slate-600 mt-1">Live baseline; ±1 GD when scoreline is not provided.</p>
 
       <div className="mt-6 overflow-x-auto">
         <table className="min-w-full text-sm">
